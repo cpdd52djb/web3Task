@@ -1,4 +1,7 @@
 import asyncio, sys, loguru, time
+import random
+import string
+
 from curl_cffi.requests import AsyncSession
 from eth_account.messages import encode_defunct
 from web3 import AsyncWeb3
@@ -72,9 +75,11 @@ class Twitter:
 
 
 class Macaron:
-    def __init__(self, private_key: str, auth_token: str):
+    def __init__(self, private_key: str, auth_token: str, nstChannelID: str, nstPassword: str):
+        session = ''.join(random.choice(string.digits + string.ascii_letters) for _ in range(10))
+        nstproxy = f"http://{nstChannelID}-residential-country_ANY-r_5m-s_{session}:{nstPassword}@gw-us.nstproxy.com:24125"
         self.w3 = AsyncWeb3(AsyncWeb3.AsyncHTTPProvider('https://arbitrum.blockpi.network/v1/rpc/public'))
-        self.client = AsyncSession()
+        self.client = AsyncSession(proxy=nstproxy, timeout=120, impersonate="chrome120")
         self.account = self.w3.eth.account.from_key(private_key)
         self.twitter = Twitter(auth_token)
 
@@ -212,28 +217,26 @@ class Macaron:
             return False
 
 
-async def do(semaphore, private_key, auth_token):
+async def do(semaphore, private_key, auth_token, nstChannelID, nstPassword):
     async with semaphore:
         for _ in range(3):
-            if await Macaron(private_key, auth_token).login():
+            if await Macaron(private_key, auth_token, nstChannelID, nstPassword).login():
                 break
 
 
-async def main(filePath):
+async def main(filePath, nstChannelID, nstPassword):
     semaphore = asyncio.Semaphore(10)
     task = []
     with open(filePath, 'r') as f:
         for account_line in f:
             account_line = account_line.strip().split('----')
-            task.append(do(semaphore, account_line[1].strip(), account_line[2].strip()))
+            task.append(do(semaphore, account_line[1].strip(), account_line[2].strip(), nstChannelID, nstPassword))
 
     await asyncio.gather(*task)
 
 
 if __name__ == '__main__':
-    print('号多多 hdd.cm 推特低至0.2元一个')
-    print('号多多 hdd.cm 推特低至0.2元一个')
-    print('号多多 hdd.cm 推特低至0.2元一个')
-    print('账户文件格式：地址----私钥----推特auth_token')
     _filePath = input("请输入账户文件路径：").strip()
-    asyncio.run(main(_filePath))
+    _nstChannelID = input("请输入nstproxy通道ID：").strip()
+    _nstPassword = input("请输入nstproxy通道密码：").strip()
+    asyncio.run(main(_filePath, _nstChannelID, _nstPassword))

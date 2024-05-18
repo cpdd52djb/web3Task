@@ -13,7 +13,7 @@ logger.add(sys.stdout, colorize=True, format="<g>{time:HH:mm:ss:SSS}</g> | <leve
 
 
 class UXLink:
-    def __init__(self, private_key: str):
+    def __init__(self, private_key: str, nstChannelID: str, nstPassword: str):
         RPC_list = [
             'https://arbitrum.llamarpc.com', 'https://arb1.arbitrum.io/rpc', 'https://rpc.ankr.com/arbitrum',
             'https://1rpc.io/arb', 'https://arb-pokt.nodies.app', 'https://arbitrum.blockpi.network/v1/rpc/public',
@@ -22,7 +22,7 @@ class UXLink:
         ]
         self.w3 = AsyncWeb3(AsyncWeb3.AsyncHTTPProvider(random.choice(RPC_list)))
         session = ''.join(random.choice(string.digits + string.ascii_letters) for _ in range(10))
-        nstproxy = f"http://C6F4EAC55874BB94-residential-country_ANY-r_5m-s_{session}:fo8DIWrX@gw-us.nstproxy.com:24125"
+        nstproxy = f"http://{nstChannelID}-residential-country_ANY-r_5m-s_{session}:{nstPassword}@gw-us.nstproxy.com:24125"
         proxies = {'all://': nstproxy}
         self.client = AsyncClient(proxies=proxies, timeout=120)
         self.account = self.w3.eth.account.from_key(private_key)
@@ -105,7 +105,8 @@ class UXLink:
                     'chainId': 42161,
                     'nonce': await self.w3.eth.get_transaction_count(self.account.address),
                     'gas': 262262,
-                    'gasPrice': self.w3.to_wei(0.01, 'gwei')
+                    'maxFeePerGas': self.w3.to_wei(0.02, 'gwei'),
+                    'maxPriorityFeePerGas': 10,
                 })
                 tx['gas'] = await self.w3.eth.estimate_gas(tx)
                 signed_tx = self.account.sign_transaction(tx)
@@ -126,17 +127,17 @@ class UXLink:
             return False
 
 
-async def do(semaphore, private_key):
+async def do(semaphore, private_key, nstChannelID, nstPassword):
     async with semaphore:
         for _ in range(3):
-            if await UXLink(private_key).login():
+            if await UXLink(private_key, nstChannelID, nstPassword).login():
                 break
 
 
-async def main(filePath):
+async def main(filePath, nstChannelID, nstPassword):
     semaphore = asyncio.Semaphore(10)
     with open(filePath, 'r') as f:
-        task = [do(semaphore, account_line.strip().split('----')[1].strip()) for account_line in f]
+        task = [do(semaphore, account_line.strip().split('----')[1].strip(), nstChannelID, nstPassword) for account_line in f]
     hour = 13
     while True:
         if hour == 13:
@@ -148,9 +149,8 @@ async def main(filePath):
 
 
 if __name__ == '__main__':
-    print('号多多 hdd.cm 推特低至0.2元一个')
-    print('号多多 hdd.cm 推特低至0.2元一个')
-    print('号多多 hdd.cm 推特低至0.2元一个')
     print('账户文件格式：地址----私钥')
     _filePath = input("请输入账户文件路径：").strip()
-    asyncio.run(main(_filePath))
+    _nstChannelID = input("请输入nstproxy通道ID：").strip()
+    _nstPassword = input("请输入nstproxy通道密码：").strip()
+    asyncio.run(main(_filePath, _nstChannelID, _nstPassword))
